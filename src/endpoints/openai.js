@@ -783,6 +783,8 @@ custom.post('/generate-voice', async (request, response) => {
 
         if (custom_params && typeof custom_params === 'object' && !Array.isArray(custom_params)) {
             for (const [k, v] of Object.entries(custom_params)) {
+                if (!k || !k.trim()) continue;
+                if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
                 if (!Object.hasOwn(requestBody, k)) {
                     requestBody[k] = v;
                 }
