@@ -9,3 +9,23 @@
     flex-direction: column;
     gap: 5px;
 }
+
+#openai_compatible_custom_params_list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.openai_compatible_custom_param_row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.openai_compatible_custom_param_row .text_pole:first-child {
+    flex: 0.4;
+}
+
+.openai_compatible_custom_param_row .text_pole:nth-child(2) {
+    flex: 1;
+}
