@@ -17,6 +17,7 @@ class OpenAICompatibleTtsProvider {
         speed: 1,
         available_voices: ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'],
         provider_endpoint: 'http://127.0.0.1:8000/v1/audio/speech',
+        customParams: [],
     };
 
     get settingsHtml() {
@@ -36,7 +37,21 @@ class OpenAICompatibleTtsProvider {
         <label for="openai_compatible_tts_voices">Available Voices (comma separated):</label>
         <input id="openai_compatible_tts_voices" type="text" class="text_pole" value="${this.defaultSettings.available_voices.join()}"/>
         <label for="openai_compatible_tts_speed">Speed: <span id="openai_compatible_tts_speed_output"></span></label>
-        <input type="range" id="openai_compatible_tts_speed" value="1" min="0.25" max="4" step="0.05">`;
+        <input type="range" id="openai_compatible_tts_speed" value="1" min="0.25" max="4" step="0.05">
+        <div class="inline-drawer">
+            <div class="inline-drawer-toggle inline-drawer-header">
+                <b>Custom Parameters</b>
+                <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+            </div>
+            <div class="inline-drawer-content">
+                <small>Add extra key-value pairs to include in the API request body.</small>
+                <div id="openai_compatible_custom_params_list"></div>
+                <div id="openai_compatible_custom_params_add" class="menu_button menu_button_icon">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Add</span>
+                </div>
+            </div>
+        </div>`;
         return html;
     }
 
@@ -87,6 +102,16 @@ class OpenAICompatibleTtsProvider {
 
         $('#openai_compatible_tts_speed_output').text(this.settings.speed);
 
+        if (!Array.isArray(this.settings.customParams)) {
+            this.settings.customParams = [];
+        }
+        this.renderCustomParams();
+        $('#openai_compatible_custom_params_add').on('click', () => {
+            this.settings.customParams.push({ key: '', value: '' });
+            this.renderCustomParams();
+            saveTtsProviderSettings();
+        });
+
         $('#openai_compatible_tts_key').toggleClass('success', !!secret_state[SECRET_KEYS.CUSTOM_OPENAI_TTS]);
         [event_types.SECRET_WRITTEN, event_types.SECRET_DELETED, event_types.SECRET_ROTATED].forEach(event => {
             eventSource.on(event, this.handler);
@@ -105,6 +130,49 @@ class OpenAICompatibleTtsProvider {
         this.settings.speed = Number($('#openai_compatible_tts_speed').val());
         $('#openai_compatible_tts_speed_output').text(this.settings.speed);
         saveTtsProviderSettings();
+    }
+
+    renderCustomParams() {
+        const container = $('#openai_compatible_custom_params_list');
+        container.empty();
+
+        this.settings.customParams.forEach((param, index) => {
+            const row = document.createElement('div');
+            row.className = 'openai_compatible_custom_param_row';
+
+            const keyInput = document.createElement('input');
+            keyInput.type = 'text';
+            keyInput.className = 'text_pole';
+            keyInput.placeholder = 'Key (e.g. instructions)';
+            keyInput.value = param.key;
+            keyInput.addEventListener('input', () => {
+                this.settings.customParams[index].key = keyInput.value;
+                saveTtsProviderSettings();
+            });
+
+            const valueInput = document.createElement('input');
+            valueInput.type = 'text';
+            valueInput.className = 'text_pole';
+            valueInput.placeholder = 'Value';
+            valueInput.value = param.value;
+            valueInput.addEventListener('input', () => {
+                this.settings.customParams[index].value = valueInput.value;
+                saveTtsProviderSettings();
+            });
+
+            const deleteBtn = document.createElement('div');
+            deleteBtn.className = 'menu_button menu_button_icon';
+            deleteBtn.title = 'Remove parameter';
+            deleteBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+            deleteBtn.addEventListener('click', () => {
+                this.settings.customParams.splice(index, 1);
+                this.renderCustomParams();
+                saveTtsProviderSettings();
+            });
+
+            row.append(keyInput, valueInput, deleteBtn);
+            container.append(row);
+        });
     }
 
     async checkReady() {
@@ -158,6 +226,15 @@ class OpenAICompatibleTtsProvider {
 
     async fetchTtsGeneration(inputText, voiceId) {
         console.info(`Generating new TTS for voice_id ${voiceId}`);
+
+        const customParamsObj = {};
+        for (const param of this.settings.customParams) {
+            const key = param.key?.trim();
+            if (key) {
+                customParamsObj[key] = param.value;
+            }
+        }
+
         const response = await fetch('/api/openai/custom/generate-voice', {
             method: 'POST',
             headers: getRequestHeaders(),
@@ -168,6 +245,7 @@ class OpenAICompatibleTtsProvider {
                 voice: voiceId,
                 response_format: 'mp3',
                 speed: this.settings.speed,
+                custom_params: customParamsObj,
             }),
         });
 

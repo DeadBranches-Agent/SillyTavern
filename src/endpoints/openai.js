@@ -766,11 +766,29 @@ const custom = express.Router();
 custom.post('/generate-voice', async (request, response) => {
     try {
         const key = readSecret(request.user.directories, SECRET_KEYS.CUSTOM_OPENAI_TTS);
-        const { input, provider_endpoint, response_format, voice, speed, model } = request.body;
+        const { input, provider_endpoint, response_format, voice, speed, model, custom_params } = request.body;
 
         if (!provider_endpoint) {
             console.warn('No OpenAI-compatible TTS provider endpoint provided');
             return response.sendStatus(400);
+        }
+
+        const requestBody = {
+            input: input ?? '',
+            response_format: response_format ?? 'mp3',
+            voice: voice ?? 'alloy',
+            speed: speed ?? 1,
+            model: model ?? 'tts-1',
+        };
+
+        if (custom_params && typeof custom_params === 'object' && !Array.isArray(custom_params)) {
+            for (const [k, v] of Object.entries(custom_params)) {
+                if (!k || !k.trim()) continue;
+                if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+                if (!Object.hasOwn(requestBody, k)) {
+                    requestBody[k] = v;
+                }
+            }
         }
 
         const result = await fetch(provider_endpoint, {
@@ -779,13 +797,7 @@ custom.post('/generate-voice', async (request, response) => {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${key ?? ''}`,
             },
-            body: JSON.stringify({
-                input: input ?? '',
-                response_format: response_format ?? 'mp3',
-                voice: voice ?? 'alloy',
-                speed: speed ?? 1,
-                model: model ?? 'tts-1',
-            }),
+            body: JSON.stringify(requestBody),
         });
 
         if (!result.ok) {
